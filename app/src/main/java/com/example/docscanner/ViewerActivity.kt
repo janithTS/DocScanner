@@ -1,117 +1,102 @@
-package com.example.docscanner;
+package com.example.docscanner
 
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.content.res.Resources;
-import android.graphics.Bitmap;
-import android.graphics.Matrix;
-import android.graphics.Point;
-import android.net.Uri;
-import android.os.Bundle;
-import android.os.Environment;
-import android.os.Parcelable;
-import android.provider.MediaStore;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.RadioGroup;
-import android.widget.Toast;
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.net.Uri
+import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
+import android.view.View
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.RadioGroup
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import org.sdase.submission.documentscanner.DocumentDetector
+import org.sdase.submission.documentscanner.extensions.saveToFile
+import org.sdase.submission.documentscanner.extensions.toPoint
+import org.sdase.submission.documentscanner.models.PointDouble
+import org.sdase.submission.documentscanner.models.Quad
+import org.sdase.submission.documentscanner.utils.FileUtil
+import org.sdase.submission.documentscanner.utils.ImageUtil
+import java.io.File
+import java.io.FileNotFoundException
+import java.io.FileOutputStream
+import java.io.IOException
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
-import org.sdase.submission.documentscanner.DocumentDetector;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
-public class ViewerActivity extends AppCompatActivity {
-
-    private ImageView normalizedImageView;
-    private Point[] points;
-    private Bitmap rawImage;
-    private Bitmap normalized;
-    private DocumentDetector ddn;
-    private int rotation = 0;
-
-    private static final String[] WRITE_EXTERNAL_STORAGE_PERMISSION = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE};
-    private static final int WRITE_EXTERNAL_STORAGE_REQUEST_CODE = 10;
-
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_viewer);
-
-        Button rotateButton = findViewById(R.id.rotateButton);
-        Button saveImageButton = findViewById(R.id.saveImageButton);
-
-        rotateButton.setOnClickListener(v -> {
-            rotation = rotation + 90;
+class ViewerActivity : AppCompatActivity() {
+    private var normalizedImageView: ImageView? = null
+    private lateinit var points: Array<PointDouble?>
+    private var rawImage: Bitmap? = null
+    private val normalized: Bitmap? = null
+    private var ddn: DocumentDetector? = null
+    private var rotation = 0
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_viewer)
+        val rotateButton = findViewById<Button>(R.id.rotateButton)
+        val saveImageButton = findViewById<Button>(R.id.saveImageButton)
+        rotateButton.setOnClickListener { v: View? ->
+            rotation = rotation + 90
             if (rotation == 360) {
-                rotation = 0;
+                rotation = 0
             }
-            normalizedImageView.setRotation(rotation);
-        });
-
-        saveImageButton.setOnClickListener(v -> {
+            normalizedImageView!!.rotation = rotation.toFloat()
+        }
+        saveImageButton.setOnClickListener { v: View? ->
             if (hasStoragePermission()) {
-                saveImage(normalized);
-            }else{
-                requestPermission();
+                saveImage(normalized)
+            } else {
+                requestPermission()
             }
-        });
-
-        RadioGroup filterRadioGroup = findViewById(R.id.filterRadioGroup);
-        filterRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(RadioGroup group, int checkedId) {
-                if (checkedId == R.id.binaryRadioButton) {
-                    updateSettings(R.raw.binary_template);
-                }else if (checkedId == R.id.grayscaleRadioButton) {
-                    updateSettings(R.raw.gray_template);
-                }else{
-                    updateSettings(R.raw.color_template);
-                }
-                normalize();
-            }
-        });
-
-        normalizedImageView = findViewById(R.id.normalizedImageView);
-        try {
-            ddn = new DocumentDetector();
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        loadImageAndPoints();
-        normalize();
+        val filterRadioGroup = findViewById<RadioGroup>(R.id.filterRadioGroup)
+        filterRadioGroup.setOnCheckedChangeListener { group, checkedId ->
+            if (checkedId == R.id.binaryRadioButton) {
+                updateSettings(R.raw.binary_template)
+            } else if (checkedId == R.id.grayscaleRadioButton) {
+                updateSettings(R.raw.gray_template)
+            } else {
+                updateSettings(R.raw.color_template)
+            }
+            //normalize();
+        }
+        normalizedImageView = findViewById(R.id.normalizedImageView)
+        try {
+            ddn = DocumentDetector()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        loadImageAndPoints()
+        //normalize()
+        cropDocumentAndFinishIntent()
     }
 
-    private void loadImageAndPoints(){
-        Uri uri = Uri.parse(getIntent().getStringExtra("imageUri"));
-        try {
-            rawImage = MediaStore.Images.Media.getBitmap(getContentResolver(),uri);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
+    private fun loadImageAndPoints() {
+        val uri = Uri.parse(intent.getStringExtra("imageUri"))
+        rawImage = try {
+            MediaStore.Images.Media.getBitmap(contentResolver, uri)
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return
         }
-        int bitmapWidth = getIntent().getIntExtra("bitmapWidth",720);
-        int bitmapHeight = getIntent().getIntExtra("bitmapHeight",1280);
-        Parcelable[] parcelables = getIntent().getParcelableArrayExtra("points");
-        points = new Point[parcelables.length];
-        for (int i = 0; i < parcelables.length; i++) {
-            points[i] = (Point) parcelables[i];
-            points[i].x = points[i].x*rawImage.getWidth()/bitmapWidth;
-            points[i].y = points[i].y*rawImage.getHeight()/bitmapHeight;
+        val bitmapWidth = intent.getIntExtra("bitmapWidth", 720)
+        val bitmapHeight = intent.getIntExtra("bitmapHeight", 1280)
+        val parcelables = intent.getParcelableArrayExtra("points")
+        points = arrayOfNulls(parcelables!!.size)
+        for (i in parcelables.indices) {
+            points[i] = parcelables[i] as PointDouble
+            points[i]!!.x = points[i]!!.x * rawImage!!.width / bitmapWidth
+            points[i]!!.y = points[i]!!.y * rawImage!!.height / bitmapHeight
         }
-
     }
 
-    private void normalize(){
-       /* Quadrilateral quad = new Quadrilateral();
+    private fun normalize() {
+        /*Quadrilateral quad = new Quadrilateral();
         quad.points = points;
         try {
             //NormalizedImageResult result = ddn.normalize(rawImage,quad);
@@ -132,7 +117,45 @@ public class ViewerActivity extends AppCompatActivity {
         }*/
     }
 
-    private void updateSettings(int id) {
+    private fun cropDocumentAndFinishIntent() {
+        val uri = Uri.parse(intent.getStringExtra("imageUri"))
+        val croppedImageResults = arrayListOf<String>()
+        // crop document photo by using corners
+        val croppedImage: Bitmap =
+            try {
+                ImageUtil().crop(
+                    uri.path!!,
+                    Quad(
+                        points[0]!!.toPoint(),
+                        points[1]!!.toPoint(),
+                        points[2]!!.toPoint(),
+                        points[3]!!.toPoint()
+                    )
+                )
+            } catch (exception: Exception) {
+                //finishIntentWithError("unable to crop image: ${exception.message}")
+                return
+            }
+
+        // delete original document photo
+        File(uri.path).delete()
+
+        // save cropped document photo
+        try {
+            val croppedImageFile = FileUtil().createImageFile(this, 0)
+            croppedImage.saveToFile(croppedImageFile)
+            croppedImageResults.add(croppedImageFile.absolutePath)
+            normalizedImageView?.setImageBitmap(croppedImage)
+        } catch (exception: Exception) {
+            //finishIntentWithError("unable to save cropped image: ${exception.message}")
+        }
+
+        // return array of cropped document photo file paths
+        //setResult(Activity.RESULT_OK, Intent().putExtra("croppedImageResults", croppedImageResults))
+        //finish()
+    }
+
+    private fun updateSettings(id: Int) {
         /*try {
             ddn.initRuntimeSettingsFromString(readTemplate(id));
         } catch (DocumentNormalizerException e) {
@@ -140,23 +163,22 @@ public class ViewerActivity extends AppCompatActivity {
         }*/
     }
 
-    private String readTemplate(int id){
-        Resources resources = this.getResources();
-        InputStream is=resources.openRawResource(id);
-        byte[] buffer;
+    private fun readTemplate(id: Int): String {
+        val resources = this.resources
+        val `is` = resources.openRawResource(id)
+        val buffer: ByteArray
         try {
-            buffer = new byte[is.available()];
-            is.read(buffer);
-            String content = new String(buffer);
-            return content;
-        } catch (IOException e) {
-            e.printStackTrace();
+            buffer = ByteArray(`is`.available())
+            `is`.read(buffer)
+            return buffer.toString()
+        } catch (e: IOException) {
+            e.printStackTrace()
         }
-        return "";
+        return ""
     }
 
-    private void convertBitmapToImageData(){
-       /* ImageData data = new ImageData();
+    private fun convertBitmapToImageData() {
+        /* ImageData data = new ImageData();
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         rawImage.compress(Bitmap.CompressFormat.JPEG,80,stream);
         byte[] byteArray = stream.toByteArray();
@@ -168,60 +190,75 @@ public class ViewerActivity extends AppCompatActivity {
         data.stride = 4 * ((rawImage.getWidth() * 3 + 31)/32);*/
     }
 
-    public void saveImage(Bitmap bmp) {
-        File appDir = new File(Environment.getExternalStorageDirectory(), "ddn");
+    fun saveImage(bmp: Bitmap?) {
+        val appDir = File(Environment.getExternalStorageDirectory(), "ddn")
         if (!appDir.exists()) {
-            appDir.mkdir();
+            appDir.mkdir()
         }
-        String fileName = System.currentTimeMillis() + ".jpg";
-        File file = new File(appDir, fileName);
+        val fileName = System.currentTimeMillis().toString() + ".jpg"
+        val file = File(appDir, fileName)
         try {
-            FileOutputStream fos = new FileOutputStream(file);
+            val fos = FileOutputStream(file)
             if (rotation != 0) {
-                Matrix matrix  = new Matrix();
-                matrix.setRotate(rotation);
-                Bitmap rotated = Bitmap.createBitmap(bmp,0,0,bmp.getWidth(),bmp.getHeight(),matrix,false);
-                rotated.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-            }else{
-                bmp.compress(Bitmap.CompressFormat.JPEG, 100, fos);
+                val matrix = Matrix()
+                matrix.setRotate(rotation.toFloat())
+                val rotated = Bitmap.createBitmap(bmp!!, 0, 0, bmp.width, bmp.height, matrix, false)
+                rotated.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+            } else {
+                bmp!!.compress(Bitmap.CompressFormat.JPEG, 100, fos)
             }
-            fos.flush();
-            fos.close();
-            Toast.makeText(ViewerActivity.this,"File saved to "+file.getAbsolutePath(),Toast.LENGTH_LONG).show();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+            fos.flush()
+            fos.close()
+            Toast.makeText(
+                this@ViewerActivity,
+                "File saved to " + file.absolutePath,
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (e: FileNotFoundException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
         }
     }
 
-    private boolean hasStoragePermission() {
+    private fun hasStoragePermission(): Boolean {
         return ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ) == PackageManager.PERMISSION_GRANTED;
+            this,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
-    private void requestPermission() {
+    private fun requestPermission() {
         ActivityCompat.requestPermissions(
-                this,
-                WRITE_EXTERNAL_STORAGE_PERMISSION,
-                WRITE_EXTERNAL_STORAGE_REQUEST_CODE
-        );
+            this,
+            WRITE_EXTERNAL_STORAGE_PERMISSION,
+            WRITE_EXTERNAL_STORAGE_REQUEST_CODE
+        )
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                                           int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode) {
-            case WRITE_EXTERNAL_STORAGE_REQUEST_CODE:
-                if (grantResults.length > 0 &&
-                        grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    saveImage(normalized);
-                } else {
-                    Toast.makeText(this, "Please grant the permission to write external storage.", Toast.LENGTH_SHORT).show();
-                }
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            WRITE_EXTERNAL_STORAGE_REQUEST_CODE -> if (grantResults.size > 0 &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ) {
+                saveImage(normalized)
+            } else {
+                Toast.makeText(
+                    this,
+                    "Please grant the permission to write external storage.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
+    }
+
+    companion object {
+        private val WRITE_EXTERNAL_STORAGE_PERMISSION =
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        private const val WRITE_EXTERNAL_STORAGE_REQUEST_CODE = 10
     }
 }

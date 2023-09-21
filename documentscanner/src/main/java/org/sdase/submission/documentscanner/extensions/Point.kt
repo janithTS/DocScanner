@@ -1,9 +1,10 @@
 package org.sdase.submission.documentscanner.extensions
 
 import android.graphics.PointF
+import org.opencv.core.Point
+import org.sdase.submission.documentscanner.models.PointDouble
 import kotlin.math.pow
 import kotlin.math.sqrt
-import org.opencv.core.Point
 
 /**
  * converts an OpenCV point to Android point
@@ -11,7 +12,15 @@ import org.opencv.core.Point
  * @return Android point
  */
 fun Point.toPointF(): PointF {
-  return PointF(x.toFloat(), y.toFloat())
+    return PointF(x.toFloat(), y.toFloat())
+}
+
+fun Point.toPointD(): PointDouble {
+    return PointDouble(x, y)
+}
+
+fun PointDouble.toPoint(): Point {
+    return Point(x, y)
 }
 
 /**
@@ -21,7 +30,7 @@ fun Point.toPointF(): PointF {
  * @return the distance between this point and the 2nd point
  */
 fun Point.distance(point: Point): Double {
-  return sqrt((point.x - x).pow(2) + (point.y - y).pow(2))
+    return sqrt((point.x - x).pow(2) + (point.y - y).pow(2))
 }
 
 /**
@@ -32,7 +41,7 @@ fun Point.distance(point: Point): Double {
  * @return the OpenCV point after moving it (dx, dy)
  */
 fun Point.move(dx: Double, dy: Double): Point {
-  return Point(x + dx, y + dy)
+    return Point(x + dx, y + dy)
 }
 
 /**
@@ -41,7 +50,7 @@ fun Point.move(dx: Double, dy: Double): Point {
  * @return OpenCV point
  */
 fun PointF.toOpenCVPoint(): Point {
-  return Point(x.toDouble(), y.toDouble())
+    return Point(x.toDouble(), y.toDouble())
 }
 
 /**
@@ -50,7 +59,7 @@ fun PointF.toOpenCVPoint(): Point {
  * @return Android point after multiplying by magnitude
  */
 fun PointF.multiply(magnitude: Float): PointF {
-  return PointF(magnitude * x, magnitude * y)
+    return PointF(magnitude * x, magnitude * y)
 }
 
 /**
@@ -61,7 +70,7 @@ fun PointF.multiply(magnitude: Float): PointF {
  * @return the Android point after moving it (dx, dy)
  */
 fun PointF.move(dx: Float, dy: Float): PointF {
-  return PointF(x + dx, y + dy)
+    return PointF(x + dx, y + dy)
 }
 
 /**
@@ -71,5 +80,5 @@ fun PointF.move(dx: Float, dy: Float): PointF {
  * @return the distance between this point and the 2nd point
  */
 fun PointF.distance(point: PointF): Float {
-  return sqrt((point.x - x).pow(2) + (point.y - y).pow(2))
+    return sqrt((point.x - x).pow(2) + (point.y - y).pow(2))
 }

@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
@@ -23,12 +24,13 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import com.example.docscanner.Bitmap.toBitmap
 import com.google.common.util.concurrent.ListenableFuture
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Point
 import org.sdase.submission.documentscanner.DocumentDetector
 import org.sdase.submission.documentscanner.extensions.move
+import org.sdase.submission.documentscanner.extensions.toPointD
+import org.sdase.submission.documentscanner.extensions.toPointF
 import org.sdase.submission.documentscanner.models.Quad
 import java.io.File
 import java.util.concurrent.ExecutionException
@@ -38,6 +40,7 @@ import java.util.concurrent.Executors
 
 class CameraActivity : AppCompatActivity() {
 
+    private var bitmap: Bitmap? = null
     private var previewView: PreviewView? = null
     private var overlayView: OverlayView? = null
     private var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>? = null
@@ -46,7 +49,8 @@ class CameraActivity : AppCompatActivity() {
     private var ddn: DocumentDetector? = null
     private var imageCapture: ImageCapture? = null
     private var taken = false
-    private val previousResults: List<Point> = ArrayList<Point>()
+    private val previousResults = arrayListOf<Point>()
+    lateinit var results: List<Point>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,6 +77,24 @@ class CameraActivity : AppCompatActivity() {
             }
         }, ContextCompat.getMainExecutor(this))
         initDDN()
+
+        val capture: ImageButton = findViewById(R.id.btnCamera)
+        capture.setOnClickListener {
+            if (!taken) {
+                //if (previousResults.size == 3) {
+                    //if (steady() == true) {
+                    Log.d("DDN", "take photo")
+                    bitmap?.let { it1 -> takePhoto(results, it1.width, it1.height) }
+                    taken = true
+                    //} else {
+                    //previousResults.remove(0)
+                    //previousResults.add(result)
+                    //}
+                //} else {
+                    //previousResults.add(result)
+                //}
+            }
+        }
     }
 
     @SuppressLint("UnsafeExperimentalUsageError")
@@ -93,11 +115,10 @@ class CameraActivity : AppCompatActivity() {
         val imageAnalysis = imageAnalysisBuilder.build()
         imageAnalysis.setAnalyzer(exec!!) { image ->
             @SuppressLint("UnsafeOptInUsageError")
-            val bitmap = BitmapUtils.getBitmap(image)
+            bitmap = BitmapUtils.getBitmap(image)
             overlayView!!.srcImageWidth = bitmap!!.width
-            overlayView!!.srcImageHeight = bitmap.height
+            overlayView!!.srcImageHeight = bitmap!!.height
             try {
-                var results: List<Point>
                 try {
                     val (topLeft, topRight, bottomLeft, bottomRight) = getDocumentCorners(bitmap!!)
                     Quad(topLeft, topRight, bottomRight, bottomLeft)
@@ -110,23 +131,8 @@ class CameraActivity : AppCompatActivity() {
                 }
 
                 if (results.isNotEmpty()) {
-                    val resultPoints =
-                        results.map { android.graphics.Point(it.x.toInt(), it.y.toInt()) }
                     overlayView!!.points = results
-                    /*if (!taken) {
-                        if (previousResults.size == 3) {
-                            if (steady() == true) {
-                                Log.d("DDN", "take photo")
-                                takePhoto(resultPoints, bitmap.width, bitmap.height)
-                                taken = true
-                            } else {
-                                previousResults.remove(0)
-                                previousResults.add(result)
-                            }
-                        } else {
-                            previousResults.add(result)
-                        }
-                    }*/
+
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -203,10 +209,11 @@ class CameraActivity : AppCompatActivity() {
     }*/
 
     private fun takePhoto(
-        result: List<android.graphics.Point>,
+        result: List<Point>,
         bitmapWidth: Int,
         bitmapHeight: Int
     ) {
+        val pointFs = result.map { it.toPointD() }
         val dir = externalCacheDir
         val file = File(dir, "photo.jpg")
         val outputFileOptions = OutputFileOptions.Builder(file).build()
@@ -220,7 +227,7 @@ class CameraActivity : AppCompatActivity() {
                         CroppingActivity::class.java
                     )
                     intent.putExtra("imageUri", outputFileResults.savedUri.toString())
-                    intent.putExtra("points", result.toTypedArray())
+                    intent.putExtra("points", pointFs.toTypedArray())
                     intent.putExtra("bitmapWidth", bitmapWidth)
                     intent.putExtra("bitmapHeight", bitmapHeight)
                     startActivity(intent)
