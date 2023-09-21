@@ -1,0 +1,20 @@
+{
+  "GlobalParameter":{
+    "Name":"GP",
+    "MaxTotalImageDimension":0
+  },
+  "ImageParameterArray":[
+    {
+      "Name":"IP-1",
+      "NormalizerParameterName":"NP-1",
+      "BaseImageParameterName":""
+    }
+  ],
+  "NormalizerParameterArray":[
+    {
+      "Name":"NP-1",
+      "ContentType": "CT_DOCUMENT",
+      "ColourMode": "ICM_BINARY"
+    }
+  ]
+}
