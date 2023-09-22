@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
@@ -23,14 +25,16 @@ import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.net.toFile
 import androidx.lifecycle.LifecycleOwner
+import com.example.docscanner.Bitmap.rotationDegrees
 import com.google.common.util.concurrent.ListenableFuture
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Point
 import org.sdase.submission.documentscanner.DocumentDetector
 import org.sdase.submission.documentscanner.extensions.move
+import org.sdase.submission.documentscanner.extensions.saveToFile
 import org.sdase.submission.documentscanner.extensions.toPointD
-import org.sdase.submission.documentscanner.extensions.toPointF
 import org.sdase.submission.documentscanner.models.Quad
 import java.io.File
 import java.util.concurrent.ExecutionException
@@ -82,16 +86,16 @@ class CameraActivity : AppCompatActivity() {
         capture.setOnClickListener {
             if (!taken) {
                 //if (previousResults.size == 3) {
-                    //if (steady() == true) {
-                    Log.d("DDN", "take photo")
-                    bitmap?.let { it1 -> takePhoto(results, it1.width, it1.height) }
-                    taken = true
-                    //} else {
-                    //previousResults.remove(0)
-                    //previousResults.add(result)
-                    //}
+                //if (steady() == true) {
+                Log.d("DDN", "take photo")
+                bitmap?.let { it1 -> takePhoto(results, it1.width, it1.height) }
+                taken = true
                 //} else {
-                    //previousResults.add(result)
+                //previousResults.remove(0)
+                //previousResults.add(result)
+                //}
+                //} else {
+                //previousResults.add(result)
                 //}
             }
         }
@@ -114,6 +118,8 @@ class CameraActivity : AppCompatActivity() {
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         val imageAnalysis = imageAnalysisBuilder.build()
         imageAnalysis.setAnalyzer(exec!!) { image ->
+            rotationDegrees =
+                image.imageInfo.rotationDegrees
             @SuppressLint("UnsafeOptInUsageError")
             bitmap = BitmapUtils.getBitmap(image)
             overlayView!!.srcImageWidth = bitmap!!.width
@@ -144,6 +150,7 @@ class CameraActivity : AppCompatActivity() {
         preview.setSurfaceProvider(previewView!!.surfaceProvider)
         imageCapture = ImageCapture.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+            .setTargetRotation(rotationDegrees)
             .build()
         val useCaseGroup = UseCaseGroup.Builder()
             .addUseCase(preview)
@@ -222,6 +229,27 @@ class CameraActivity : AppCompatActivity() {
                 override fun onImageSaved(outputFileResults: OutputFileResults) {
                     Log.d("DDN", "saved")
                     Log.d("DDN", outputFileResults.savedUri.toString())
+                    val uri = outputFileResults.savedUri
+                    //val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                    val bitmap =
+                        com.example.docscanner.Bitmap.handleSamplingAndRotationBitmap(
+                            this@CameraActivity,
+                            uri
+                        )
+                    val matrix = Matrix().apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            postRotate(rotationDegrees.toFloat())
+                        }
+                    }
+                    val bitmap1 = bitmap?.let {
+                        com.example.docscanner.Bitmap.getResizedBitmap(
+                            it,
+                            matrix
+                        )
+                    }
+                    val file = uri?.toFile()
+                    file?.let { bitmap1?.saveToFile(it) }
+
                     val intent = Intent(
                         this@CameraActivity,
                         CroppingActivity::class.java

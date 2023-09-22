@@ -1,14 +1,28 @@
 package com.example.docscanner
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.net.Uri
+import android.util.Base64
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
+import androidx.camera.lifecycle.ProcessCameraProvider
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+import kotlin.math.roundToInt
 
 object Bitmap {
+
+    var rotationDegrees: Int = 0
 
     fun ImageProxy.toBitmap(): Bitmap? {
         val nv21 = yuv420888ToNv21(this)
@@ -145,5 +159,114 @@ object Bitmap {
                 }
             }
         }
+    }
+
+    fun handleSamplingAndRotationBitmap(context: Context, selectedImage: Uri?): Bitmap? {
+        val MAX_HEIGHT = 1024
+        val MAX_WIDTH = 1024
+
+        // First decode with inJustDecodeBounds=true to check dimensions
+        val options = BitmapFactory.Options()
+        options.inJustDecodeBounds = true
+        var imageStream = context.contentResolver.openInputStream(selectedImage!!)
+        BitmapFactory.decodeStream(imageStream, null, options)
+        imageStream!!.close()
+
+        // Calculate inSampleSize
+        options.inSampleSize = calculateInSampleSize(options, MAX_WIDTH, MAX_HEIGHT)
+
+        // Decode bitmap with inSampleSize set
+        options.inJustDecodeBounds = false
+        imageStream = context.contentResolver.openInputStream(selectedImage)
+        return BitmapFactory.decodeStream(imageStream, null, options)
+    }
+
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int, reqHeight: Int
+    ): Int {
+        // Raw height and width of image
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+
+            // Calculate ratios of height and width to requested height and width
+            val heightRatio = (height.toFloat() / reqHeight.toFloat()).roundToInt()
+            val widthRatio = (width.toFloat() / reqWidth.toFloat()).roundToInt()
+
+            // Choose the smallest ratio as inSampleSize value, this will guarantee a final image
+            // with both dimensions larger than or equal to the requested height and width.
+            inSampleSize = if (heightRatio < widthRatio) heightRatio else widthRatio
+
+            // This offers some additional logic in case the image has a strange
+            // aspect ratio. For example, a panorama may have a much larger
+            // width than height. In these cases the total pixels might still
+            // end up being too large to fit comfortably in memory, so we should
+            // be more aggressive with sample down the image (=larger inSampleSize).
+            val totalPixels = (width * height).toFloat()
+
+            // Anything more than 2x the requested pixels we'll sample down further
+            val totalReqPixelsCap = (reqWidth * reqHeight * 2).toFloat()
+            while (totalPixels / (inSampleSize * inSampleSize) > totalReqPixelsCap) {
+                inSampleSize++
+            }
+        }
+        return inSampleSize
+    }
+
+    fun getOutputFileOptions(
+        photoFile: File
+    ): ImageCapture.OutputFileOptions {
+
+        // Setup image capture metadata
+        val metadata = ImageCapture.Metadata().apply {
+            // Mirror image when using the front camera
+            isReversedHorizontal = true
+        }
+        // Create output options object which contains file + metadata
+
+        return ImageCapture.OutputFileOptions.Builder(photoFile)
+            .setMetadata(metadata)
+            .build()
+    }
+
+    val executor: Executor
+        get() = Executors.newSingleThreadExecutor()
+
+    suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCoroutine { continuation ->
+        ProcessCameraProvider.getInstance(this).also { future ->
+            future.addListener({
+                continuation.resume(future.get())
+            }, executor)
+        }
+    }
+
+    fun getResizedBitmap(bitmap: Bitmap, matrix: Matrix): Bitmap {
+        val rotatedBitmap =
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        val maxSize = 1280
+        var outWidth = 0
+        var outHeight = 0
+
+        val width = rotatedBitmap.width
+        val height = rotatedBitmap.height
+
+        if (width > height) {
+            outWidth = maxSize
+            outHeight = (height * maxSize) / width
+        } else {
+            outWidth = (width * maxSize) / height
+            outHeight = maxSize
+        }
+
+        return Bitmap.createScaledBitmap(rotatedBitmap, outWidth, outHeight, false)
+    }
+
+    fun bitmapToBase64(bitmap: Bitmap): String {
+        val bos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, bos);
+        val b = bos.toByteArray()
+        return Base64.encodeToString(b, Base64.NO_WRAP)
     }
 }
