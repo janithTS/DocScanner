@@ -242,7 +242,7 @@ class ViewerActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
-            WRITE_EXTERNAL_STORAGE_REQUEST_CODE -> if (grantResults.size > 0 &&
+            WRITE_EXTERNAL_STORAGE_REQUEST_CODE -> if (grantResults.isNotEmpty() &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED
             ) {
                 saveImage(normalized)
