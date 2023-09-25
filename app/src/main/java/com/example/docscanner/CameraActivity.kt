@@ -137,7 +137,7 @@ class CameraActivity : AppCompatActivity() {
                 }
 
                 if (results.isNotEmpty()) {
-                    overlayView!!.points = results
+                    overlayView!!.setPointsDraw(results)
 
                 }
             } catch (e: Exception) {

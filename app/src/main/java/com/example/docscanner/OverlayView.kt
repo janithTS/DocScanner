@@ -51,10 +51,10 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : SurfaceView(context
 
     override fun surfaceDestroyed(surfaceHolder: SurfaceHolder) {}
 
-    /*fun setPoints(points: List<Point>) {
+    fun setPointsDraw(points: List<Point>) {
         this.points = points
         drawPolygon()
-    }*/
+    }
 
     fun setPointsAndImageGeometry(points: List<Point>?, width: Int, height: Int) {
         srcImageWidth = width
