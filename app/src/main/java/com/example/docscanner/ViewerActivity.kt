@@ -41,7 +41,7 @@ class ViewerActivity : AppCompatActivity() {
         val rotateButton = findViewById<Button>(R.id.rotateButton)
         val saveImageButton = findViewById<Button>(R.id.saveImageButton)
         rotateButton.setOnClickListener { v: View? ->
-            rotation = rotation + 90
+            rotation += 90
             if (rotation == 360) {
                 rotation = 0
             }
