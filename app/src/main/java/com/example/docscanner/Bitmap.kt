@@ -86,16 +86,19 @@ object Bitmap {
                     outputStride = 1
                     outputOffset = 0
                 }
+
                 1 -> {
                     outputStride = 2
                     // For NV21 format, U is in odd-numbered indices
                     outputOffset = pixelCount + 1
                 }
+
                 2 -> {
                     outputStride = 2
                     // For NV21 format, V is in even-numbered indices
                     outputOffset = pixelCount
                 }
+
                 else -> {
                     // Image contains more than 3 planes, something strange is going on
                     return@forEachIndexed
@@ -142,7 +145,8 @@ object Bitmap {
             for (row in 0 until planeHeight) {
                 // Move buffer position to the beginning of this row
                 planeBuffer.position(
-                    (row + planeCrop.top) * rowStride + planeCrop.left * pixelStride)
+                    (row + planeCrop.top) * rowStride + planeCrop.left * pixelStride
+                )
 
                 if (pixelStride == 1 && outputStride == 1) {
                     // When there is a single stride value for pixel and output, we can just copy
@@ -162,8 +166,8 @@ object Bitmap {
     }
 
     fun handleSamplingAndRotationBitmap(context: Context, selectedImage: Uri?): Bitmap? {
-        val MAX_HEIGHT = 1024
-        val MAX_WIDTH = 1024
+        val MAX_HEIGHT = 3840
+        val MAX_WIDTH = 3840
 
         // First decode with inJustDecodeBounds=true to check dimensions
         val options = BitmapFactory.Options()
@@ -183,7 +187,8 @@ object Bitmap {
 
     private fun calculateInSampleSize(
         options: BitmapFactory.Options,
-        reqWidth: Int, reqHeight: Int
+        reqWidth: Int,
+        reqHeight: Int
     ): Int {
         // Raw height and width of image
         val height = options.outHeight
@@ -234,18 +239,19 @@ object Bitmap {
     val executor: Executor
         get() = Executors.newSingleThreadExecutor()
 
-    suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCoroutine { continuation ->
-        ProcessCameraProvider.getInstance(this).also { future ->
-            future.addListener({
-                continuation.resume(future.get())
-            }, executor)
+    suspend fun Context.getCameraProvider(): ProcessCameraProvider =
+        suspendCoroutine { continuation ->
+            ProcessCameraProvider.getInstance(this).also { future ->
+                future.addListener({
+                    continuation.resume(future.get())
+                }, executor)
+            }
         }
-    }
 
     fun getResizedBitmap(bitmap: Bitmap, matrix: Matrix): Bitmap {
         val rotatedBitmap =
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        val maxSize = 1280
+        val maxSize = 2160
         var outWidth = 0
         var outHeight = 0
 

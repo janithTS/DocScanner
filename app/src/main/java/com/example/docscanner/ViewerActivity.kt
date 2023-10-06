@@ -77,16 +77,16 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun loadImageAndPoints() {
-        val uri = Uri.parse(intent.getStringExtra("imageUri"))
+        val uri = Uri.parse(intent.getStringExtra(Extra.IMAGE_URI))
         rawImage = try {
             MediaStore.Images.Media.getBitmap(contentResolver, uri)
         } catch (e: IOException) {
             e.printStackTrace()
             return
         }
-        val bitmapWidth = intent.getIntExtra("bitmapWidth", 720)
-        val bitmapHeight = intent.getIntExtra("bitmapHeight", 1280)
-        val parcelables = intent.getParcelableArrayExtra("points")
+        val bitmapWidth = intent.getIntExtra(Extra.WIDTH, 720)
+        val bitmapHeight = intent.getIntExtra(Extra.HEIGHT, 1280)
+        val parcelables = intent.getParcelableArrayExtra(Extra.POINTS)
         points = arrayOfNulls(parcelables!!.size)
         for (i in parcelables.indices) {
             points[i] = parcelables[i] as PointDouble
@@ -118,7 +118,7 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun cropDocumentAndFinishIntent() {
-        val uri = Uri.parse(intent.getStringExtra("imageUri"))
+        val uri = Uri.parse(intent.getStringExtra(Extra.IMAGE_URI))
         val croppedImageResults = arrayListOf<String>()
         // crop document photo by using corners
         val croppedImage: Bitmap =

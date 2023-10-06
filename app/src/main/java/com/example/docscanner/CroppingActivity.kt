@@ -51,10 +51,10 @@ class CroppingActivity : AppCompatActivity() {
         okayButton = findViewById(R.id.okayButton)
         okayButton?.setOnClickListener { v: View? ->
             val intent = Intent(this, ViewerActivity::class.java)
-            intent.putExtra("imageUri", getIntent().getStringExtra("imageUri"))
-            intent.putExtra("points", points)
-            intent.putExtra("bitmapWidth", bitmapWidth)
-            intent.putExtra("bitmapHeight", bitmapHeight)
+            intent.putExtra(Extra.IMAGE_URI, getIntent().getStringExtra(Extra.IMAGE_URI))
+            intent.putExtra(Extra.POINTS, points)
+            intent.putExtra(Extra.WIDTH, bitmapWidth)
+            intent.putExtra(Extra.HEIGHT, bitmapHeight)
             startActivity(intent)
         }
         corner1 = findViewById(R.id.corner1)
@@ -72,15 +72,15 @@ class CroppingActivity : AppCompatActivity() {
         windowManager.defaultDisplay.getMetrics(metrics)
         screenWidth = metrics.widthPixels
         screenHeight = metrics.heightPixels
-        bitmapWidth = intent.getIntExtra("bitmapWidth", 720)
-        bitmapHeight = intent.getIntExtra("bitmapHeight", 1280)
+        bitmapWidth = intent.getIntExtra(Extra.WIDTH, 720)
+        bitmapHeight = intent.getIntExtra(Extra.HEIGHT, 1280)
         loadPoints()
         loadImage()
         setEvents()
     }
 
     private fun loadPoints() {
-        val parcelables = intent.getParcelableArrayExtra("points")
+        val parcelables = intent.getParcelableArrayExtra(Extra.POINTS)
         points = arrayOfNulls(parcelables!!.size)
         for (i in parcelables.indices) {
             points[i] = parcelables[i] as PointDouble
@@ -89,7 +89,7 @@ class CroppingActivity : AppCompatActivity() {
 
     private fun loadImage() {
         try {
-            val uri = Uri.parse(intent.getStringExtra("imageUri"))
+            val uri = Uri.parse(intent.getStringExtra(Extra.IMAGE_URI))
             val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
             imageView!!.setImageBitmap(bitmap)
             background = bitmap

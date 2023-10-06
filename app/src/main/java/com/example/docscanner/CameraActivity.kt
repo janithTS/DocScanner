@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toFile
 import androidx.lifecycle.LifecycleOwner
 import com.example.docscanner.Bitmap.rotationDegrees
+import com.example.docscanner.BitmapUtils.getBitmap
 import com.google.common.util.concurrent.ListenableFuture
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Point
@@ -115,13 +116,14 @@ class CameraActivity : AppCompatActivity() {
         val preview = previewBuilder.build()
         val imageAnalysisBuilder = ImageAnalysis.Builder()
         imageAnalysisBuilder.setTargetResolution(resolution)
+            //.setTargetAspectRatio(AspectRatio.RATIO_16_9)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         val imageAnalysis = imageAnalysisBuilder.build()
         imageAnalysis.setAnalyzer(exec!!) { image ->
             rotationDegrees =
                 image.imageInfo.rotationDegrees
             @SuppressLint("UnsafeOptInUsageError")
-            bitmap = BitmapUtils.getBitmap(image)
+            bitmap = image.getBitmap()
             overlayView!!.srcImageWidth = bitmap!!.width
             overlayView!!.srcImageHeight = bitmap!!.height
             try {
@@ -220,7 +222,7 @@ class CameraActivity : AppCompatActivity() {
         bitmapWidth: Int,
         bitmapHeight: Int
     ) {
-        val pointFs = result.map { it.toPointD() }
+
         val dir = externalCacheDir
         val file = File(dir, "photo.jpg")
         val outputFileOptions = OutputFileOptions.Builder(file).build()
@@ -250,15 +252,26 @@ class CameraActivity : AppCompatActivity() {
                     val file = uri?.toFile()
                     file?.let { bitmap1?.saveToFile(it) }
 
-                    val intent = Intent(
-                        this@CameraActivity,
-                        CroppingActivity::class.java
-                    )
-                    intent.putExtra("imageUri", outputFileResults.savedUri.toString())
-                    intent.putExtra("points", pointFs.toTypedArray())
-                    intent.putExtra("bitmapWidth", bitmapWidth)
-                    intent.putExtra("bitmapHeight", bitmapHeight)
-                    startActivity(intent)
+                    try {
+                        val (topLeft, topRight, bottomLeft, bottomRight) = getDocumentCorners(
+                            bitmap1!!
+                        )
+                        Quad(topLeft, topRight, bottomRight, bottomLeft)
+                        var resultx = listOf(topLeft, topRight, bottomRight, bottomLeft)
+                        val pointFs = resultx.map { it.toPointD() }
+                        val intent = Intent(
+                            this@CameraActivity,
+                            CroppingActivity::class.java
+                        )
+                        intent.putExtra(Extra.IMAGE_URI, outputFileResults.savedUri.toString())
+                        intent.putExtra(Extra.POINTS, pointFs.toTypedArray())
+                        intent.putExtra(Extra.WIDTH, bitmap1!!.width)
+                        intent.putExtra(Extra.HEIGHT, bitmap1!!.height)
+                        startActivity(intent)
+                    } catch (exception: Exception) {
+                        finishIntentWithError("unable to get document corners: ${exception.message}")
+                        return
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {}

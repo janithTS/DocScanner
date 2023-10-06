@@ -31,7 +31,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : SurfaceView(context
             // Add this as surfaceHolder callback object.
             surfaceHolder?.addCallback(this)
         }
-        stroke.color = Color.GREEN
+        stroke.color = Color.WHITE
         // Set the parent view background color. This can not set surfaceview background color.
         setBackgroundColor(Color.TRANSPARENT)
 
